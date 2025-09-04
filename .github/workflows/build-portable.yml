@@ -22,23 +22,22 @@ jobs:
           cache-downloads: true
           cache-environment: true
 
-      - name: Show Python & env
+      - name: Show Python & env (inside pyenv)
         shell: bash
         run: |
-          python -V
-          which python || where python
-          micromamba info
+          micromamba run -n pyenv python -V
+          micromamba run -n pyenv python -c "import sys; print('sys.prefix:', sys.prefix)"
 
       - name: Install conda-pack inside env
         shell: bash
         run: |
-          python -m pip install --no-input conda-pack
-          python -c "import conda_pack,sys; print('conda_pack', conda_pack.__version__)"
+          micromamba run -n pyenv python -m pip install --no-input conda-pack
+          micromamba run -n pyenv python -c "import conda_pack,sys; print('conda_pack', conda_pack.__version__, 'prefix:', sys.prefix)"
 
       - name: Pack environment to pyenv.tar.gz
         shell: bash
         run: |
-          python - <<'PY'
+          micromamba run -n pyenv python - <<'PY'
           import sys, conda_pack
           print("Packing from prefix:", sys.prefix)
           conda_pack.pack(prefix=sys.prefix, output="pyenv.tar.gz", verbose=True)
