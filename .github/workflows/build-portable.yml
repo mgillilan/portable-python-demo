@@ -16,17 +16,26 @@ jobs:
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
+          activate-environment: pyenv   # must match the name in environment.yml
+          init-shell: pwsh              # use pwsh, not "powershell"
           cache-downloads: true
           cache-environment: true
-          init-shell: powershell
 
-      - name: Install conda-pack
+      - name: Show Python (should be env python)
         shell: pwsh
-        run: python -m pip install conda-pack
+        run: |
+          python -V
+          where python
 
-      - name: Pack environment
+      - name: Install conda-pack inside env
         shell: pwsh
-        run: conda-pack -o pyenv.zip
+        run: |
+          python -m pip install --no-input conda-pack
+
+      - name: Pack environment to pyenv.zip
+        shell: pwsh
+        run: |
+          python -m conda_pack -o pyenv.zip
 
       - name: Prepare bundle
         shell: pwsh
@@ -35,7 +44,6 @@ jobs:
           Expand-Archive -Path pyenv.zip -DestinationPath bundle\pyenv -Force
           New-Item -ItemType Directory -Force -Path bundle\app | Out-Null
           Copy-Item -Recurse app\* bundle\app\
-          
           $bat = @'
           @echo off
           setlocal

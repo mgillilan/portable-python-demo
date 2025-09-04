@@ -7,3 +7,5 @@ dependencies:
   - numpy
   - pandas
   - requests
+  - vs2015_runtime
+
