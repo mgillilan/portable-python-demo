@@ -36,10 +36,15 @@ jobs:
           python -m pip install --no-input conda-pack
           python -c "import conda_pack, sys; print('conda-pack version:', conda_pack.__version__)"
 
-      - name: Pack environment to pyenv.tar.gz (verbose)
+      - name: Pack environment to pyenv.tar.gz (robust)
         shell: powershell
         run: |
-          python -c 'import sys, conda_pack; print("conda_pack version:", conda_pack.__version__); conda_pack.pack(prefix=sys.prefix, output="pyenv.tar.gz", verbose=True)'
+          @'
+import sys, conda_pack
+print("conda_pack version:", conda_pack.__version__)
+conda_pack.pack(prefix=sys.prefix, output="pyenv.tar.gz", verbose=True)
+'@ | Out-File -Encoding ascii pack.py
+          python pack.py
           if (!(Test-Path pyenv.tar.gz)) { Write-Error "pyenv.tar.gz not created" }
           Get-ChildItem -Force
 
