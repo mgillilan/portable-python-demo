@@ -15,30 +15,31 @@ jobs:
       - name: Set up micromamba
         uses: mamba-org/setup-micromamba@v2
         with:
-          environment-file: environment.yml
-          activate-environment: pyenv   # must match the name in environment.yml
-          init-shell: pwsh              # use pwsh, not "powershell"
+          environment-file: environment.yml      # creates env from your file
+          environment-name: pyenv                # must match name you want
+          init-shell: powershell                 # valid values include 'powershell'
+          generate-run-shell: true               # make subsequent steps auto-use the env
           cache-downloads: true
           cache-environment: true
 
       - name: Show Python (should be env python)
-        shell: pwsh
+        shell: powershell
         run: |
           python -V
           where python
 
       - name: Install conda-pack inside env
-        shell: pwsh
+        shell: powershell
         run: |
           python -m pip install --no-input conda-pack
 
       - name: Pack environment to pyenv.zip
-        shell: pwsh
+        shell: powershell
         run: |
-          python -m conda_pack -o pyenv.zip
+          python -m conda_pack -o pyenv.zip -v
 
       - name: Prepare bundle
-        shell: pwsh
+        shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path bundle | Out-Null
           Expand-Archive -Path pyenv.zip -DestinationPath bundle\pyenv -Force
@@ -59,7 +60,7 @@ jobs:
           Set-Content -Path bundle\RUN_ME.bat -Value $bat -Encoding ascii
 
       - name: Zip final bundle
-        shell: pwsh
+        shell: powershell
         run: Compress-Archive -Path bundle\* -DestinationPath python_portable_win.zip -Force
 
       - name: Upload artifact
