@@ -39,11 +39,7 @@ jobs:
       - name: Pack environment to pyenv.tar.gz (verbose)
         shell: powershell
         run: |
-          python - <<'PY'
-          import sys, conda_pack
-          print("conda_pack version:", conda_pack.__version__)
-          conda_pack.pack(prefix=sys.prefix, output="pyenv.tar.gz", verbose=True)
-          PY
+          python -c 'import sys, conda_pack; print("conda_pack version:", conda_pack.__version__); conda_pack.pack(prefix=sys.prefix, output="pyenv.tar.gz", verbose=True)'
           if (!(Test-Path pyenv.tar.gz)) { Write-Error "pyenv.tar.gz not created" }
           Get-ChildItem -Force
 
