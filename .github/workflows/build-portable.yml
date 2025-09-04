@@ -8,54 +8,56 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repo
+        uses: actions/checkout@v4
 
       - name: Set up micromamba
         uses: mamba-org/setup-micromamba@v2
         with:
-          micromamba-version: "2.0.5-0"
           environment-file: environment.yml
           cache-downloads: true
           cache-environment: true
           init-shell: powershell
 
       - name: Install conda-pack
-        shell: bash
-        run: |
-          python -m pip install --no-input conda-pack
+        shell: pwsh
+        run: python -m pip install conda-pack
 
       - name: Pack environment
-        shell: bash
-        run: |
-          conda-pack -o pyenv.zip
+        shell: pwsh
+        run: conda-pack -o pyenv.zip
 
       - name: Prepare bundle
         shell: pwsh
         run: |
-          mkdir bundle
-          Expand-Archive pyenv.zip -DestinationPath bundle\pyenv
-          mkdir bundle\app
+          New-Item -ItemType Directory -Force -Path bundle | Out-Null
+          Expand-Archive -Path pyenv.zip -DestinationPath bundle\pyenv -Force
+          New-Item -ItemType Directory -Force -Path bundle\app | Out-Null
           Copy-Item -Recurse app\* bundle\app\
-          @"
-@echo off
-setlocal
-cd /d %~dp0
-if exist .\pyenv\Scripts\conda-unpack.exe (
-  .\pyenv\Scripts\conda-unpack.exe
-)
-.\pyenv\python.exe .\app\main.py
-pause >nul
-"@ | Out-File bundle\RUN_ME.bat -Encoding ascii
+          
+          $bat = @'
+          @echo off
+          setlocal
+          cd /d %~dp0
+          if exist .\pyenv\Scripts\conda-unpack.exe (
+            .\pyenv\Scripts\conda-unpack.exe
+          )
+          .\pyenv\python.exe .\app\main.py
+          echo.
+          echo Done. Press any key to exit.
+          pause >nul
+          '@
+          Set-Content -Path bundle\RUN_ME.bat -Value $bat -Encoding ascii
 
       - name: Zip final bundle
         shell: pwsh
-        run: |
-          Compress-Archive -Path bundle\* -DestinationPath python_portable_win.zip
+        run: Compress-Archive -Path bundle\* -DestinationPath python_portable_win.zip -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: python_portable_win
           path: python_portable_win.zip
+          if-no-files-found: error
+
