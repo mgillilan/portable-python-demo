@@ -12,58 +12,52 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v4
 
-      - name: Set up micromamba
+      - name: Set up micromamba (bash)
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
-          environment-name: pyenv            # must match your intended env name
-          init-shell: powershell             # valid value for v2
-          generate-run-shell: true           # auto-activate for subsequent steps
+          environment-name: pyenv           # must match your env name
+          init-shell: bash                  # IMPORTANT: bash, not powershell
+          generate-run-shell: true          # auto-activate env in later steps
           cache-downloads: true
           cache-environment: true
 
       - name: Show Python & env
-        shell: powershell
+        shell: bash
         run: |
           python -V
-          where python
+          which python || where python
           micromamba info
-          micromamba list | Select-String -Pattern "conda-pack" -SimpleMatch -Quiet; if ($LASTEXITCODE -ne 0) { Write-Host "conda-pack not yet installed" }
 
       - name: Install conda-pack inside env
-        shell: powershell
+        shell: bash
         run: |
           python -m pip install --no-input conda-pack
-          python -c "import conda_pack, sys; print('conda-pack version:', conda_pack.__version__)"
+          python -c "import conda_pack,sys; print('conda_pack', conda_pack.__version__)"
 
-      - name: Pack environment to pyenv.tar.gz (robust)
-        shell: powershell
+      - name: Pack environment to pyenv.tar.gz
+        shell: bash
         run: |
-          @'
-import sys, conda_pack
-print("conda_pack version:", conda_pack.__version__)
-conda_pack.pack(prefix=sys.prefix, output="pyenv.tar.gz", verbose=True)
-'@ | Out-File -Encoding ascii pack.py
-          python pack.py
-          if (!(Test-Path pyenv.tar.gz)) { Write-Error "pyenv.tar.gz not created" }
-          Get-ChildItem -Force
+          python - <<'PY'
+          import sys, conda_pack
+          print("Packing from prefix:", sys.prefix)
+          conda_pack.pack(prefix=sys.prefix, output="pyenv.tar.gz", verbose=True)
+          PY
+          ls -l
+          [ -f pyenv.tar.gz ] || { echo "pyenv.tar.gz not created"; exit 1; }
 
       - name: Prepare bundle (untar, stage app, write launcher)
-        shell: powershell
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
-          New-Item -ItemType Directory -Force -Path bundle | Out-Null
-          New-Item -ItemType Directory -Force -Path bundle\pyenv | Out-Null
-          # Use bsdtar/tar (available on Windows runners)
-          tar -xzf pyenv.tar.gz -C bundle\pyenv
-          if (!(Test-Path bundle\pyenv\python.exe)) {
-            # conda-pack usually extracts into ./; python.exe is at root of the extracted tree
-            # List tree to debug on failure
-            Write-Host "Listing bundle\pyenv after extract:"; Get-ChildItem -Recurse -Depth 2 bundle\pyenv
-          }
-          New-Item -ItemType Directory -Force -Path bundle\app | Out-Null
-          if (Test-Path app) { Copy-Item -Recurse app\* bundle\app\ } else { New-Item -ItemType File -Path bundle\app\main.py -Value 'print("Hello from portable Python!")' | Out-Null }
-          $bat = @'
+          set -euo pipefail
+          mkdir -p bundle/pyenv
+          tar -xzf pyenv.tar.gz -C bundle/pyenv
+          mkdir -p bundle/app
+          if [ -d app ]; then cp -r app/* bundle/app/ || true; else
+            printf '%s\n' 'print("Hello from portable Python!")' > bundle/app/main.py
+          fi
+          # Write Windows .bat launcher
+          cat > bundle/RUN_ME.bat <<'BAT'
           @echo off
           setlocal
           cd /d %~dp0
@@ -74,15 +68,17 @@ conda_pack.pack(prefix=sys.prefix, output="pyenv.tar.gz", verbose=True)
           echo.
           echo Done. Press any key to exit.
           pause >nul
-          '@
-          Set-Content -Path bundle\RUN_ME.bat -Value $bat -Encoding ascii
-          Write-Host "Bundle contents:"; Get-ChildItem -Recurse -Depth 2 bundle
+          BAT
+          echo "Bundle tree:"
+          (cd bundle && find . -maxdepth 2 -type f -print)
 
       - name: Zip final bundle
-        shell: powershell
+        shell: bash
         run: |
-          Compress-Archive -Path bundle\* -DestinationPath python_portable_win.zip -Force
-          Get-Item python_portable_win.zip | Format-List *
+          # Use PowerShell's Compress-Archive from bash
+          powershell -NoLogo -NoProfile -Command \
+            "Compress-Archive -Path 'bundle\\*' -DestinationPath 'python_portable_win.zip' -Force"
+          ls -l python_portable_win.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
